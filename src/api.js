@@ -66,4 +66,15 @@ export const getNotifications = ()   => api.get('/notifications/').then(r => r.d
 export const markAllRead      = ()   => api.post('/notifications/mark-read/').then(r => r.data);
 export const markOneRead      = (id) => api.post(`/notifications/${id}/read/`).then(r => r.data);
 
+// Add these to your existing api.js
+
+export const getGroupSettlements = (groupId) =>
+  api.get(`/settlements/group/${groupId}/`).then(r => r.data);
+
+export const getSettlementDetail = (id) =>
+  api.get(`/settlements/detail/${id}/`).then(r => r.data);
+
+export const paySettlement = (id, amount, note = '') =>
+  api.post(`/settlements/${id}/pay/`, { amount, note }).then(r => r.data);
+
 export default api;
