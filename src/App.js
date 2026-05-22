@@ -1,112 +1,65 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { getUsers, getGroups } from './api';
-import GroupList from './components/GroupList';
-import GroupDetail from './components/GroupDetail';
-import UserManagement from './components/UserManagement';
-import { Menu, X, LayoutDashboard, Users, ChevronRight } from 'lucide-react';
+import { Routes, Route, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { getMe, getGroups, getUsers, joinByToken } from './api';
+import toast from 'react-hot-toast';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import Dashboard from './pages/Dashboard';
+import GroupPage from './pages/GroupPage';
+import JoinPage from './pages/JoinPage';
 
 export const AppContext = createContext({});
 export const useApp = () => useContext(AppContext);
+
+function PrivateRoute({ children }) {
+  const token = localStorage.getItem('access_token');
+  return token ? children : <Navigate to="/login" replace />;
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers]   = useState([]);
   const [groups, setGroups] = useState([]);
-  const [page, setPage]     = useState('groups');
-  const [selectedGroup, setSelectedGroup] = useState(null);
-  const [sidebarOpen, setSidebarOpen]     = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([getUsers(), getGroups()]).then(([u, g]) => {
-      setUsers(u); setGroups(g);
-      if (u.length) setCurrentUser(u[0]);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+  const refreshGroups = () => getGroups().then(setGroups).catch(() => {});
+  const refreshUsers  = () => getUsers().then(setUsers).catch(() => {});
 
-  const refreshGroups = () => getGroups().then(setGroups);
-  const refreshUsers  = () => getUsers().then(setUsers);
   const categoryEmoji = c => ({ trip:'✈️', flat:'🏠', dinner:'🍽️', other:'💼' }[c] ?? '💼');
 
-  const navTo = (p, group = null) => { setPage(p); setSelectedGroup(group); setSidebarOpen(false); };
+  const logout = () => {
+    localStorage.clear();
+    setCurrentUser(null);
+    setGroups([]);
+    window.location.href = '/login';
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    if (!token) { setLoading(false); return; }
+    Promise.all([getMe(), getGroups(), getUsers()])
+      .then(([me, g, u]) => { setCurrentUser(me); setGroups(g); setUsers(u); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   if (loading) return (
-    <div className="loading" style={{ minHeight: '100vh' }}>
-      <div className="spinner" /><span>Loading SplitSmart…</span>
+    <div className="loading" style={{ minHeight:'100vh' }}>
+      <div className="spinner"/>
+      <span>Loading SplitSmart…</span>
     </div>
   );
 
   return (
-    <AppContext.Provider value={{ currentUser, users, groups, refreshGroups, refreshUsers, categoryEmoji }}>
-      <div className="app">
-        <button className="hamburger" onClick={() => setSidebarOpen(o => !o)}>
-          {sidebarOpen ? <X size={20}/> : <Menu size={20}/>}
-        </button>
-
-        {sidebarOpen && (
-          <div onClick={() => setSidebarOpen(false)}
-            style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:99 }} />
-        )}
-
-        <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
-          <div className="logo">
-            <div className="logo-title">SplitSmart</div>
-            <div className="logo-sub">SMART EXPENSE SPLITTER</div>
-          </div>
-
-          <div className="nav-section">
-            <div className="nav-label">Menu</div>
-            <button className={`nav-item ${page==='groups'?'active':''}`} onClick={() => navTo('groups')}>
-              <LayoutDashboard size={18}/> Groups
-              {groups.length > 0 && <span className="nav-badge">{groups.length}</span>}
-            </button>
-            <button className={`nav-item ${page==='users'?'active':''}`} onClick={() => navTo('users')}>
-              <Users size={18}/> Members
-            </button>
-          </div>
-
-          {groups.length > 0 && (
-            <div className="nav-section" style={{ marginTop:8 }}>
-              <div className="nav-label">Your Groups</div>
-              {groups.map(g => (
-                <button key={g.id}
-                  className={`nav-item ${selectedGroup?.id===g.id?'active':''}`}
-                  onClick={() => navTo('group', g)}>
-                  <span style={{ fontSize:16 }}>{categoryEmoji(g.category)}</span>
-                  <span style={{ flex:1, textAlign:'left', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                    {g.name}
-                  </span>
-                  <ChevronRight size={14} style={{ flexShrink:0, opacity:.4 }}/>
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div className="user-switcher">
-            <label>ACTIVE USER</label>
-            <select className="user-select"
-              value={currentUser?.id || ''}
-              onChange={e => setCurrentUser(users.find(u => u.id === +e.target.value))}>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            {currentUser && (
-              <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:10 }}>
-                <div className="avatar" style={{ background:currentUser.avatar_color, width:28, height:28, fontSize:11, border:'none' }}>
-                  {currentUser.name[0]}
-                </div>
-                <span style={{ fontSize:12, color:'var(--text2)' }}>{currentUser.email}</span>
-              </div>
-            )}
-          </div>
-        </nav>
-
-        <main className="main">
-          {page==='groups' && <GroupList onSelectGroup={g => navTo('group', g)} />}
-          {page==='group'  && selectedGroup && <GroupDetail group={selectedGroup} onBack={() => navTo('groups')} />}
-          {page==='users'  && <UserManagement />}
-        </main>
-      </div>
+    <AppContext.Provider value={{ currentUser, setCurrentUser, users, groups, refreshGroups, refreshUsers, logout, categoryEmoji }}>
+      <Routes>
+        <Route path="/login"  element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/join/:token" element={<PrivateRoute><JoinPage /></PrivateRoute>} />
+        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/group/:id" element={<PrivateRoute><GroupPage /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </AppContext.Provider>
   );
 }
