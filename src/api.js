@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const BASE = process.env.REACT_APP_API_URL || 'https://splitwise-backend-j4uh.onrender.com';
 const api  = axios.create({ baseURL: BASE });
 
 api.interceptors.request.use(cfg => {
